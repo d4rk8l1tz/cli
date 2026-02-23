@@ -29,7 +29,7 @@ With Entire, you can:
 
 - Git
 - macOS or Linux (Windows via WSL)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or [OpenCode](https://opencode.ai/docs/cli/) installed and authenticated
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [OpenCode](https://opencode.ai/docs/cli/), or [Windsurf](https://docs.windsurf.com/windsurf/cascade/hooks) installed and authenticated
 
 ## Quick Start
 
@@ -56,13 +56,13 @@ entire status
 entire enable
 ```
 
-This installs agent and git hooks to work with your AI agent (Claude Code, Gemini CLI or OpenCode). You'll be prompted to select which agents to enable. To enable a specific agent non-interactively, use `entire enable --agent <name>` (e.g., `entire enable --agent opencode`).
+This installs agent and git hooks to work with your AI agent (Claude Code, Gemini CLI, OpenCode, or Windsurf). You'll be prompted to select which agents to enable. To enable a specific agent non-interactively, use `entire enable --agent <name>` (e.g., `entire enable --agent windsurf`).
 
 The hooks capture session data as you work. Checkpoints are created when you or the agent make a git commit. Your code commits stay clean, Entire never creates commits on your active branch. All session metadata is stored on a separate `entire/checkpoints/v1` branch.
 
 ### 2. Work with Your AI Agent
 
-Just use Claude Code, Gemini CLI, or OpenCode normally. Entire runs in the background, tracking your session:
+Just use Claude Code, Gemini CLI, OpenCode, or Windsurf normally. Entire runs in the background, tracking your session:
 
 ```
 entire status  # Check current session status anytime
@@ -171,7 +171,7 @@ Multiple AI sessions can run on the same commit. If you start a second session w
 
 | Flag                   | Description                                                           |
 | ---------------------- | --------------------------------------------------------------------- |
-| `--agent <name>`       | AI agent to install hooks for: `claude-code`, `gemini`, or `opencode` |
+| `--agent <name>`       | AI agent to install hooks for: `claude-code`, `gemini`, `opencode`, or `windsurf` |
 | `--force`, `-f`        | Force reinstall hooks (removes existing Entire hooks first)           |
 | `--local`              | Write settings to `settings.local.json` instead of `settings.json`    |
 | `--project`            | Write settings to `settings.json` even if it already exists           |
@@ -232,6 +232,7 @@ Each agent stores its hook configuration in its own directory. When you run `ent
 | Claude Code | `.claude/settings.json`       | JSON hooks config |
 | Gemini CLI  | `.gemini/settings.json`       | JSON hooks config |
 | OpenCode    | `.opencode/plugins/entire.ts` | TypeScript plugin |
+| Windsurf    | `.windsurf/hooks.json`        | JSON hooks config |
 
 You can enable multiple agents at the same time — each agent's hooks are independent. Entire detects which agents are active by checking for installed hooks, not by a setting in `settings.json`.
 
@@ -289,6 +290,22 @@ Or select OpenCode from the interactive agent picker when running `entire enable
 All commands (`rewind`, `status`, `doctor`, etc.) work the same regardless of which agent is configured.
 
 If you run into any issues with OpenCode integration, please [open an issue](https://github.com/entireio/cli/issues).
+
+### Windsurf Cascade
+
+Windsurf Cascade support is currently in preview. Entire can work with [Windsurf](https://docs.windsurf.com/windsurf/cascade/hooks) as an alternative to Claude Code, or alongside it — you can have multiple agents' hooks enabled at the same time.
+
+To enable:
+
+```bash
+entire enable --agent windsurf
+```
+
+Or select Windsurf from the interactive agent picker when running `entire enable`.
+
+All commands (`rewind`, `status`, `doctor`, etc.) work the same regardless of which agent is configured.
+
+If you run into any issues with Windsurf integration, please [open an issue](https://github.com/entireio/cli/issues).
 
 ## Security & Privacy
 
