@@ -13,6 +13,7 @@ import (
 	"github.com/entireio/cli/cmd/entire/cli/agent/claudecode"
 	"github.com/entireio/cli/cmd/entire/cli/agent/geminicli"
 	"github.com/entireio/cli/cmd/entire/cli/agent/opencode"
+	"github.com/entireio/cli/cmd/entire/cli/agent/windsurf"
 	cpkg "github.com/entireio/cli/cmd/entire/cli/checkpoint"
 	"github.com/entireio/cli/cmd/entire/cli/checkpoint/id"
 	"github.com/entireio/cli/cmd/entire/cli/logging"
@@ -547,6 +548,21 @@ func extractUserPrompts(agentType agent.AgentType, content string) []string {
 		return nil
 	}
 
+	// Windsurf stores native hook events in JSONL. Pull prompts from pre_user_prompt events.
+	if agentType == agent.AgentTypeWindsurf {
+		prompts, err := windsurf.ExtractAllUserPrompts([]byte(content))
+		if err == nil && len(prompts) > 0 {
+			cleaned := make([]string, 0, len(prompts))
+			for _, prompt := range prompts {
+				if stripped := textutil.StripIDEContextTags(prompt); stripped != "" {
+					cleaned = append(cleaned, stripped)
+				}
+			}
+			return cleaned
+		}
+		return nil
+	}
+
 	// OpenCode uses JSONL with a different per-line schema than Claude Code
 	if agentType == agent.AgentTypeOpenCode {
 		prompts, err := opencode.ExtractAllUserPrompts([]byte(content))
@@ -597,6 +613,11 @@ func calculateTokenUsage(agentType agent.AgentType, data []byte, startOffset int
 	}
 
 	if len(data) == 0 {
+		return &agent.TokenUsage{}
+	}
+
+	// Windsurf hook payloads don't currently include token usage fields.
+	if agentType == agent.AgentTypeWindsurf {
 		return &agent.TokenUsage{}
 	}
 

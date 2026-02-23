@@ -13,6 +13,7 @@ import (
 	"github.com/entireio/cli/cmd/entire/cli/agent"
 	"github.com/entireio/cli/cmd/entire/cli/agent/claudecode"
 	"github.com/entireio/cli/cmd/entire/cli/agent/geminicli"
+	"github.com/entireio/cli/cmd/entire/cli/agent/windsurf"
 	"github.com/entireio/cli/cmd/entire/cli/logging"
 	"github.com/entireio/cli/cmd/entire/cli/paths"
 
@@ -79,6 +80,8 @@ func getHookType(hookName string) string {
 	case claudecode.HookNamePreTask, claudecode.HookNamePostTask, claudecode.HookNamePostTodo:
 		return "subagent"
 	case geminicli.HookNameBeforeTool, geminicli.HookNameAfterTool:
+		return "tool"
+	case windsurf.HookNamePostWriteCode:
 		return "tool"
 	default:
 		return "agent"

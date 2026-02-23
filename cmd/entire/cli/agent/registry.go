@@ -95,6 +95,7 @@ const (
 	AgentNameCursor     AgentName = "cursor"
 	AgentNameGemini     AgentName = "gemini"
 	AgentNameOpenCode   AgentName = "opencode"
+	AgentNameWindsurf   AgentName = "windsurf"
 )
 
 // Agent type constants (type identifiers stored in metadata/trailers)
@@ -103,6 +104,7 @@ const (
 	AgentTypeCursor     AgentType = "Cursor IDE"
 	AgentTypeGemini     AgentType = "Gemini CLI"
 	AgentTypeOpenCode   AgentType = "OpenCode"
+	AgentTypeWindsurf   AgentType = "Windsurf Cascade"
 	AgentTypeUnknown    AgentType = "Agent" // Fallback for backwards compatibility
 )
 
