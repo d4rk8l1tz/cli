@@ -94,3 +94,34 @@ func TestTranscriptAnalyzerMethods(t *testing.T) {
 	}
 }
 
+func TestGetTranscriptPosition_EndsWithPreUserPrompt(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	transcriptPath := filepath.Join(dir, "windsurf-turn-start.jsonl")
+	content := `{"agent_action_name":"pre_user_prompt","trajectory_id":"t1","tool_info":{"user_prompt":"Prompt 1"}}
+{"agent_action_name":"post_write_code","trajectory_id":"t1","tool_info":{"file_path":"app/main.go"}}
+{"agent_action_name":"post_cascade_response","trajectory_id":"t1","tool_info":{"cascade_response":"Response 1"}}
+{"agent_action_name":"pre_user_prompt","trajectory_id":"t1","tool_info":{"user_prompt":"Prompt 2"}}
+`
+	if err := os.WriteFile(transcriptPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write transcript: %v", err)
+	}
+
+	ag := &WindsurfAgent{}
+	pos, err := ag.GetTranscriptPosition(transcriptPath)
+	if err != nil {
+		t.Fatalf("GetTranscriptPosition() error = %v", err)
+	}
+	if pos != 3 {
+		t.Fatalf("GetTranscriptPosition() = %d, want 3 (position before current pre_user_prompt)", pos)
+	}
+
+	prompts, err := ag.ExtractPrompts(transcriptPath, pos)
+	if err != nil {
+		t.Fatalf("ExtractPrompts() error = %v", err)
+	}
+	if len(prompts) != 1 || prompts[0] != "Prompt 2" {
+		t.Fatalf("ExtractPrompts(fromOffset=%d) = %v, want [Prompt 2]", pos, prompts)
+	}
+}

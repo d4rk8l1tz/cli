@@ -48,7 +48,9 @@ func parseEventsFromFile(path string) ([]hookInputRaw, error) {
 	return ParseEvents(data)
 }
 
-// GetTranscriptPosition returns the event count in a Windsurf transcript.
+// GetTranscriptPosition returns the current transcript position for incremental parsing.
+// If the latest event is pre_user_prompt, it returns the position before that event so
+// TurnStart capture can include the current prompt at TurnEnd extraction time.
 func (a *WindsurfAgent) GetTranscriptPosition(path string) (int, error) {
 	events, err := parseEventsFromFile(path)
 	if err != nil {
@@ -56,6 +58,9 @@ func (a *WindsurfAgent) GetTranscriptPosition(path string) (int, error) {
 			return 0, nil
 		}
 		return 0, err
+	}
+	if len(events) > 0 && events[len(events)-1].eventName() == actionPreUserPrompt {
+		return len(events) - 1, nil
 	}
 	return len(events), nil
 }
@@ -176,4 +181,3 @@ func extractPromptsFromEvents(events []hookInputRaw, fromOffset int) []string {
 	}
 	return prompts
 }
-

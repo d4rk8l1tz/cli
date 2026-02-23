@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/entireio/cli/cmd/entire/cli/agent"
@@ -41,6 +42,15 @@ func TestWindsurfHookFlow(t *testing.T) {
 		points := env.GetRewindPoints()
 		if len(points) == 0 {
 			t.Fatal("expected at least 1 rewind point after post-cascade-response")
+		}
+
+		// Regression: Windsurf pre_user_prompt should produce a non-default commit message
+		// in auto-commit mode (prompt extraction must include the current turn prompt).
+		if strategyName == strategy.StrategyNameAutoCommit {
+			headMessage := env.GetCommitMessage(env.GetHeadHash())
+			if strings.Contains(headMessage, "Claude Code session updates") {
+				t.Fatalf("auto-commit used fallback message, prompt extraction likely failed: %q", headMessage)
+			}
 		}
 
 		// 5. For manual-commit, user commit triggers condensation. Auto-commit already committed.
