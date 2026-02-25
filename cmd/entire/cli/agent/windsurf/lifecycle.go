@@ -88,7 +88,7 @@ func (a *WindsurfAgent) parseTurnStart(sessionRef string, input *hookInputRaw) (
 }
 
 func (a *WindsurfAgent) sessionRefForTrajectory(trajectoryID string) (string, error) {
-	repoRoot, err := paths.RepoRoot()
+	repoRoot, err := paths.WorktreeRoot()
 	if err != nil {
 		//nolint:forbidigo // Fallback for tests that run outside a git repo.
 		repoRoot, err = os.Getwd()

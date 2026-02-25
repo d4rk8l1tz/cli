@@ -28,7 +28,7 @@ var windsurfActionKeys = []string{
 }
 
 func windsurfHooksPath() (string, error) {
-	repoRoot, err := paths.RepoRoot()
+	repoRoot, err := paths.WorktreeRoot()
 	if err != nil {
 		//nolint:forbidigo // Fallback for tests outside git repositories.
 		repoRoot, err = os.Getwd()

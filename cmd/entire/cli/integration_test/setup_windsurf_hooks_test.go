@@ -16,7 +16,7 @@ func TestSetupWindsurfHooks_AddsAllRequiredHooks(t *testing.T) {
 
 	env := NewTestEnv(t)
 	env.InitRepo()
-	env.InitEntire("manual-commit")
+	env.InitEntire()
 
 	env.WriteFile("README.md", "# Test")
 	env.GitAdd("README.md")
@@ -58,7 +58,7 @@ func TestSetupWindsurfHooks_PreservesExistingSettings(t *testing.T) {
 
 	env := NewTestEnv(t)
 	env.InitRepo()
-	env.InitEntire("manual-commit")
+	env.InitEntire()
 
 	env.WriteFile("README.md", "# Test")
 	env.GitAdd("README.md")

@@ -30,15 +30,17 @@ func NewWindsurfAgent() agent.Agent {
 
 // --- Identity ---
 
-func (a *WindsurfAgent) Name() agent.AgentName   { return agent.AgentNameWindsurf }
-func (a *WindsurfAgent) Type() agent.AgentType   { return agent.AgentTypeWindsurf }
-func (a *WindsurfAgent) Description() string     { return "Windsurf Cascade - Codeium's AI coding assistant" }
+func (a *WindsurfAgent) Name() agent.AgentName { return agent.AgentNameWindsurf }
+func (a *WindsurfAgent) Type() agent.AgentType { return agent.AgentTypeWindsurf }
+func (a *WindsurfAgent) Description() string {
+	return "Windsurf Cascade - Codeium's AI coding assistant"
+}
 func (a *WindsurfAgent) IsPreview() bool         { return true }
 func (a *WindsurfAgent) ProtectedDirs() []string { return []string{".windsurf"} }
 
 // DetectPresence checks if Windsurf is configured in the repository.
 func (a *WindsurfAgent) DetectPresence() (bool, error) {
-	repoRoot, err := paths.RepoRoot()
+	repoRoot, err := paths.WorktreeRoot()
 	if err != nil {
 		repoRoot = "."
 	}
@@ -84,7 +86,7 @@ func (a *WindsurfAgent) GetSessionID(input *agent.HookInput) string {
 func (a *WindsurfAgent) GetSessionDir(repoPath string) (string, error) {
 	root := strings.TrimSpace(repoPath)
 	if root == "" {
-		repoRoot, err := paths.RepoRoot()
+		repoRoot, err := paths.WorktreeRoot()
 		if err != nil {
 			return "", fmt.Errorf("failed to get repo root: %w", err)
 		}
@@ -166,4 +168,3 @@ func sanitizeSessionIDForPath(sessionID string) string {
 	}
 	return clean
 }
-
