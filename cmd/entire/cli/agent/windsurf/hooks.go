@@ -19,6 +19,14 @@ var entireHookPrefixes = []string{
 	"go run ${WINDSURF_PROJECT_DIR}/cmd/entire/main.go ",
 }
 
+const windsurfHooksRootKey = "hooks"
+
+var windsurfActionKeys = []string{
+	actionPreUserPrompt,
+	actionPostWriteCode,
+	actionPostCascadeResponse,
+}
+
 func windsurfHooksPath() (string, error) {
 	repoRoot, err := paths.RepoRoot()
 	if err != nil {
@@ -38,16 +46,9 @@ func (a *WindsurfAgent) InstallHooks(localDev bool, force bool) (int, error) {
 		return 0, err
 	}
 
-	var rawHooks map[string]json.RawMessage
-	if data, readErr := os.ReadFile(hooksPath); readErr == nil { //nolint:gosec // Path is repo-local.
-		if err := json.Unmarshal(data, &rawHooks); err != nil {
-			return 0, fmt.Errorf("failed to parse hooks.json: %w", err)
-		}
-	} else {
-		rawHooks = make(map[string]json.RawMessage)
-	}
-	if rawHooks == nil {
-		rawHooks = make(map[string]json.RawMessage)
+	rawSettings, rawHooks, hasNestedHooks, err := loadWindsurfHookConfig(hooksPath)
+	if err != nil {
+		return 0, err
 	}
 
 	prePromptHooks, err := parseHookList(rawHooks[actionPreUserPrompt])
@@ -73,7 +74,9 @@ func (a *WindsurfAgent) InstallHooks(localDev bool, force bool) (int, error) {
 	postResponseCmd := cmdPrefix + HookNamePostCascadeResponse
 
 	// Idempotent fast-path for same mode.
+	// Keep migrating legacy top-level formats to nested {"hooks":{...}}.
 	if !force &&
+		hasNestedHooks &&
 		hookCommandExists(prePromptHooks, prePromptCmd) &&
 		hookCommandExists(postWriteHooks, postWriteCmd) &&
 		hookCommandExists(postResponseHooks, postResponseCmd) {
@@ -98,18 +101,8 @@ func (a *WindsurfAgent) InstallHooks(localDev bool, force bool) (int, error) {
 		return 0, fmt.Errorf("failed to encode %s hooks: %w", actionPostCascadeResponse, err)
 	}
 
-	//nolint:gosec // Repo-local config directory.
-	if err := os.MkdirAll(filepath.Dir(hooksPath), 0o755); err != nil {
-		return 0, fmt.Errorf("failed to create .windsurf directory: %w", err)
-	}
-
-	data, err := json.MarshalIndent(rawHooks, "", "  ")
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal hooks config: %w", err)
-	}
-
-	if err := os.WriteFile(hooksPath, data, 0o600); err != nil {
-		return 0, fmt.Errorf("failed to write hooks.json: %w", err)
+	if err := writeWindsurfHookConfig(hooksPath, rawSettings, rawHooks); err != nil {
+		return 0, err
 	}
 
 	return 3, nil
@@ -122,17 +115,16 @@ func (a *WindsurfAgent) UninstallHooks() error {
 		return err
 	}
 
-	data, err := os.ReadFile(hooksPath) //nolint:gosec // Path is repo-local.
+	rawSettings, rawHooks, _, err := loadWindsurfHookConfig(hooksPath)
 	if err != nil {
+		return err
+	}
+
+	if len(rawSettings) == 0 && len(rawHooks) == 0 {
 		return nil //nolint:nilerr // Nothing to uninstall.
 	}
 
-	var rawHooks map[string]json.RawMessage
-	if err := json.Unmarshal(data, &rawHooks); err != nil {
-		return fmt.Errorf("failed to parse hooks.json: %w", err)
-	}
-
-	for _, key := range []string{actionPreUserPrompt, actionPostWriteCode, actionPostCascadeResponse} {
+	for _, key := range windsurfActionKeys {
 		hooks, err := parseHookList(rawHooks[key])
 		if err != nil {
 			return fmt.Errorf("failed to parse %s hooks: %w", key, err)
@@ -143,12 +135,8 @@ func (a *WindsurfAgent) UninstallHooks() error {
 		}
 	}
 
-	output, err := json.MarshalIndent(rawHooks, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal hooks config: %w", err)
-	}
-	if err := os.WriteFile(hooksPath, output, 0o600); err != nil {
-		return fmt.Errorf("failed to write hooks.json: %w", err)
+	if err := writeWindsurfHookConfig(hooksPath, rawSettings, rawHooks); err != nil {
+		return err
 	}
 	return nil
 }
@@ -160,17 +148,12 @@ func (a *WindsurfAgent) AreHooksInstalled() bool {
 		return false
 	}
 
-	data, err := os.ReadFile(hooksPath) //nolint:gosec // Path is repo-local.
+	_, rawHooks, _, err := loadWindsurfHookConfig(hooksPath)
 	if err != nil {
 		return false
 	}
 
-	var rawHooks map[string]json.RawMessage
-	if err := json.Unmarshal(data, &rawHooks); err != nil {
-		return false
-	}
-
-	for _, key := range []string{actionPreUserPrompt, actionPostWriteCode, actionPostCascadeResponse} {
+	for _, key := range windsurfActionKeys {
 		hooks, err := parseHookList(rawHooks[key])
 		if err != nil {
 			continue
@@ -181,6 +164,87 @@ func (a *WindsurfAgent) AreHooksInstalled() bool {
 	}
 
 	return false
+}
+
+func loadWindsurfHookConfig(path string) (map[string]json.RawMessage, map[string]json.RawMessage, bool, error) {
+	rawSettings := make(map[string]json.RawMessage)
+	rawHooks := make(map[string]json.RawMessage)
+
+	data, err := os.ReadFile(path) //nolint:gosec // Path is repo-local.
+	if err != nil {
+		if os.IsNotExist(err) {
+			return rawSettings, rawHooks, false, nil
+		}
+		return nil, nil, false, fmt.Errorf("failed to read hooks.json: %w", err)
+	}
+
+	if err := json.Unmarshal(data, &rawSettings); err != nil {
+		return nil, nil, false, fmt.Errorf("failed to parse hooks.json: %w", err)
+	}
+	if rawSettings == nil {
+		rawSettings = make(map[string]json.RawMessage)
+	}
+
+	hasNestedHooks := false
+	if hooksSectionRaw, ok := rawSettings[windsurfHooksRootKey]; ok && len(hooksSectionRaw) > 0 {
+		if err := json.Unmarshal(hooksSectionRaw, &rawHooks); err != nil {
+			return nil, nil, false, fmt.Errorf("failed to parse hooks section: %w", err)
+		}
+		if rawHooks == nil {
+			rawHooks = make(map[string]json.RawMessage)
+		}
+		hasNestedHooks = true
+	}
+
+	// Backward compatibility: support legacy top-level action keys.
+	for _, key := range windsurfActionKeys {
+		if _, exists := rawHooks[key]; exists {
+			continue
+		}
+		if raw, ok := rawSettings[key]; ok {
+			rawHooks[key] = raw
+		}
+	}
+
+	return rawSettings, rawHooks, hasNestedHooks, nil
+}
+
+func writeWindsurfHookConfig(path string, rawSettings map[string]json.RawMessage, rawHooks map[string]json.RawMessage) error {
+	if rawSettings == nil {
+		rawSettings = make(map[string]json.RawMessage)
+	}
+	if rawHooks == nil {
+		rawHooks = make(map[string]json.RawMessage)
+	}
+
+	// Remove legacy top-level action keys to keep the file in canonical Windsurf format.
+	for _, key := range windsurfActionKeys {
+		delete(rawSettings, key)
+	}
+
+	if len(rawHooks) == 0 {
+		delete(rawSettings, windsurfHooksRootKey)
+	} else {
+		hooksSectionRaw, err := json.Marshal(rawHooks)
+		if err != nil {
+			return fmt.Errorf("failed to marshal hooks section: %w", err)
+		}
+		rawSettings[windsurfHooksRootKey] = hooksSectionRaw
+	}
+
+	//nolint:gosec // Repo-local config directory.
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("failed to create .windsurf directory: %w", err)
+	}
+
+	data, err := json.MarshalIndent(rawSettings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal hooks config: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write hooks.json: %w", err)
+	}
+	return nil
 }
 
 func parseHookList(raw json.RawMessage) ([]WindsurfHookConfig, error) {
@@ -245,4 +309,3 @@ func isEntireHook(command string) bool {
 	}
 	return false
 }
-

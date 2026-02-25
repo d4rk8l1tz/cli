@@ -41,6 +41,16 @@ func TestSetupWindsurfHooks_AddsAllRequiredHooks(t *testing.T) {
 	assertHookCommand(t, hooks[actionPreUserPrompt], "entire hooks windsurf pre-user-prompt")
 	assertHookCommand(t, hooks[actionPostWriteCode], "entire hooks windsurf post-write-code")
 	assertHookCommand(t, hooks[actionPostCascadeResponse], "entire hooks windsurf post-cascade-response")
+
+	raw := readWindsurfRawSettings(t, env)
+	if _, ok := raw["hooks"]; !ok {
+		t.Fatal("hooks.json should contain top-level \"hooks\" section")
+	}
+	for _, legacyKey := range []string{actionPreUserPrompt, actionPostWriteCode, actionPostCascadeResponse} {
+		if _, ok := raw[legacyKey]; ok {
+			t.Fatalf("legacy key %q should not exist at top-level", legacyKey)
+		}
+	}
 }
 
 func TestSetupWindsurfHooks_PreservesExistingSettings(t *testing.T) {
@@ -87,6 +97,12 @@ func TestSetupWindsurfHooks_PreservesExistingSettings(t *testing.T) {
 	if raw["custom_setting"] != "should-be-preserved" {
 		t.Fatalf("custom_setting = %v, want should-be-preserved", raw["custom_setting"])
 	}
+	if _, ok := raw["hooks"]; !ok {
+		t.Fatal("hooks.json should contain top-level \"hooks\" section")
+	}
+	if _, ok := raw[actionPreUserPrompt]; ok {
+		t.Fatalf("legacy key %q should be migrated into hooks section", actionPreUserPrompt)
+	}
 
 	hooks := readWindsurfHooks(t, env)
 	assertHookCommand(t, hooks[actionPreUserPrompt], "echo existing-hook")
@@ -108,15 +124,24 @@ func readWindsurfHooks(t *testing.T, env *TestEnv) map[string][]windsurf.Windsur
 		t.Fatalf("failed to read hooks.json: %v", err)
 	}
 
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
+	var rawSettings map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawSettings); err != nil {
 		t.Fatalf("failed to parse hooks.json: %v", err)
+	}
+	var rawHooks map[string]json.RawMessage
+	if hooksSectionRaw, ok := rawSettings["hooks"]; ok {
+		if err := json.Unmarshal(hooksSectionRaw, &rawHooks); err != nil {
+			t.Fatalf("failed to parse hooks section: %v", err)
+		}
+	} else {
+		// Legacy fallback for existing test fixtures.
+		rawHooks = rawSettings
 	}
 
 	result := make(map[string][]windsurf.WindsurfHookConfig)
 	for _, key := range []string{actionPreUserPrompt, actionPostWriteCode, actionPostCascadeResponse} {
 		var hooks []windsurf.WindsurfHookConfig
-		if section, ok := raw[key]; ok {
+		if section, ok := rawHooks[key]; ok {
 			if err := json.Unmarshal(section, &hooks); err != nil {
 				t.Fatalf("failed to parse %s hooks: %v", key, err)
 			}
@@ -124,6 +149,22 @@ func readWindsurfHooks(t *testing.T, env *TestEnv) map[string][]windsurf.Windsur
 		result[key] = hooks
 	}
 	return result
+}
+
+func readWindsurfRawSettings(t *testing.T, env *TestEnv) map[string]interface{} {
+	t.Helper()
+
+	hooksPath := filepath.Join(env.RepoDir, ".windsurf", windsurf.WindsurfHooksFileName)
+	data, err := os.ReadFile(hooksPath)
+	if err != nil {
+		t.Fatalf("failed to read hooks.json: %v", err)
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("failed to parse hooks.json: %v", err)
+	}
+	return raw
 }
 
 func assertHookCommand(t *testing.T, hooks []windsurf.WindsurfHookConfig, expected string) {
@@ -135,4 +176,3 @@ func assertHookCommand(t *testing.T, hooks []windsurf.WindsurfHookConfig, expect
 	}
 	t.Fatalf("expected hook command %q not found in %#v", expected, hooks)
 }
-

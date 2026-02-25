@@ -24,6 +24,16 @@ func TestInstallHooks_FreshInstall(t *testing.T) {
 	verifyHookCommand(t, hooks[actionPreUserPrompt], "entire hooks windsurf "+HookNamePreUserPrompt)
 	verifyHookCommand(t, hooks[actionPostWriteCode], "entire hooks windsurf "+HookNamePostWriteCode)
 	verifyHookCommand(t, hooks[actionPostCascadeResponse], "entire hooks windsurf "+HookNamePostCascadeResponse)
+
+	rawSettings := readRawSettings(t, dir)
+	if _, ok := rawSettings[windsurfHooksRootKey]; !ok {
+		t.Fatalf("expected %q root key in hooks.json", windsurfHooksRootKey)
+	}
+	for _, legacyKey := range windsurfActionKeys {
+		if _, ok := rawSettings[legacyKey]; ok {
+			t.Fatalf("legacy top-level key %q should not be written", legacyKey)
+		}
+	}
 }
 
 func TestInstallHooks_Idempotent(t *testing.T) {
@@ -93,9 +103,15 @@ func TestInstallHooks_PreservesUnknownFields(t *testing.T) {
 		t.Fatalf("InstallHooks() error = %v", err)
 	}
 
-	raw := readRawHooks(t, dir)
+	raw := readRawSettings(t, dir)
 	if _, ok := raw["custom_setting"]; !ok {
 		t.Fatalf("custom_setting field should be preserved")
+	}
+	if _, ok := raw[windsurfHooksRootKey]; !ok {
+		t.Fatalf("expected %q section to be created", windsurfHooksRootKey)
+	}
+	if _, ok := raw[actionPreUserPrompt]; ok {
+		t.Fatalf("legacy top-level key %q should be migrated into %q", actionPreUserPrompt, windsurfHooksRootKey)
 	}
 
 	hooks := readHooksFile(t, dir)
@@ -171,19 +187,15 @@ func TestAreHooksInstalled(t *testing.T) {
 
 func readHooksFile(t *testing.T, tempDir string) map[string][]WindsurfHookConfig {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(tempDir, ".windsurf", WindsurfHooksFileName))
+	settingsPath := filepath.Join(tempDir, ".windsurf", WindsurfHooksFileName)
+	_, rawHooks, _, err := loadWindsurfHookConfig(settingsPath)
 	if err != nil {
-		t.Fatalf("failed to read hooks file: %v", err)
-	}
-
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		t.Fatalf("failed to parse hooks.json: %v", err)
+		t.Fatalf("failed to load hooks config: %v", err)
 	}
 
 	out := make(map[string][]WindsurfHookConfig)
 	for _, key := range []string{actionPreUserPrompt, actionPostWriteCode, actionPostCascadeResponse} {
-		hooks, err := parseHookList(raw[key])
+		hooks, err := parseHookList(rawHooks[key])
 		if err != nil {
 			t.Fatalf("failed to parse hook list %s: %v", key, err)
 		}
@@ -192,7 +204,7 @@ func readHooksFile(t *testing.T, tempDir string) map[string][]WindsurfHookConfig
 	return out
 }
 
-func readRawHooks(t *testing.T, tempDir string) map[string]json.RawMessage {
+func readRawSettings(t *testing.T, tempDir string) map[string]json.RawMessage {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(tempDir, ".windsurf", WindsurfHooksFileName))
 	if err != nil {
@@ -215,4 +227,3 @@ func verifyHookCommand(t *testing.T, hooks []WindsurfHookConfig, command string)
 	}
 	t.Fatalf("expected hook command %q not found in %#v", command, hooks)
 }
-
