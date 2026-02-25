@@ -422,7 +422,7 @@ func detectOrSelectAgent(w io.Writer, selectFn func(available []string) ([]strin
 	}
 
 	if !hasInstalledHooks && len(detected) == 0 {
-		fmt.Fprintln(w, "No agent configuration detected (e.g., .claude, .gemini, or .opencode directory).")
+		fmt.Fprintln(w, "No agent configuration detected (e.g., .claude, .gemini, .opencode, or .windsurf directory).")
 		fmt.Fprintln(w, "This is normal - some agents don't require a config directory.")
 		fmt.Fprintln(w)
 	}

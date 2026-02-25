@@ -9,7 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
+	"github.com/entireio/cli/cmd/entire/cli/agent/windsurf"
 	"github.com/entireio/cli/cmd/entire/cli/strategy"
 )
 
@@ -1036,4 +1038,208 @@ func (env *TestEnv) CopyTranscriptToEntireTmp(sessionID, transcriptPath string) 
 	if err := os.WriteFile(destPath, srcData, 0o644); err != nil {
 		env.T.Fatalf("CopyTranscriptToEntireTmp: failed to write transcript to %q: %v", destPath, err)
 	}
+}
+
+// --- Windsurf Hook Runner ---
+
+// WindsurfHookRunner executes Windsurf hooks in the test environment.
+type WindsurfHookRunner struct {
+	RepoDir string
+	T       interface {
+		Helper()
+		Fatalf(format string, args ...interface{})
+		Logf(format string, args ...interface{})
+	}
+}
+
+// NewWindsurfHookRunner creates a new Windsurf hook runner for the given repo directory.
+func NewWindsurfHookRunner(repoDir string, t interface {
+	Helper()
+	Fatalf(format string, args ...interface{})
+	Logf(format string, args ...interface{})
+}) *WindsurfHookRunner {
+	return &WindsurfHookRunner{
+		RepoDir: repoDir,
+		T:       t,
+	}
+}
+
+func (r *WindsurfHookRunner) runWindsurfHookWithInput(hookName string, input interface{}) error {
+	r.T.Helper()
+
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return fmt.Errorf("failed to marshal hook input: %w", err)
+	}
+
+	return r.runWindsurfHookInRepoDir(hookName, inputJSON)
+}
+
+func (r *WindsurfHookRunner) runWindsurfHookInRepoDir(hookName string, inputJSON []byte) error {
+	// Command structure: entire hooks windsurf <hook-name>
+	cmd := exec.Command(getTestBinary(), "hooks", "windsurf", hookName)
+	cmd.Dir = r.RepoDir
+	cmd.Stdin = bytes.NewReader(inputJSON)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("hook %s failed: %w\nInput: %s\nOutput: %s",
+			hookName, err, inputJSON, output)
+	}
+
+	r.T.Logf("Windsurf hook %s output: %s", hookName, output)
+	return nil
+}
+
+// SimulateWindsurfPreUserPrompt simulates the pre-user-prompt hook for Windsurf.
+func (r *WindsurfHookRunner) SimulateWindsurfPreUserPrompt(trajectoryID, prompt string) error {
+	r.T.Helper()
+
+	input := map[string]interface{}{
+		"agent_action_name": "pre_user_prompt",
+		"trajectory_id":     trajectoryID,
+		"execution_id":      "exec-1",
+		"timestamp":         "2025-01-01T00:00:00Z",
+		"cwd":               r.RepoDir,
+		"tool_info": map[string]string{
+			"user_prompt": prompt,
+		},
+	}
+
+	return r.runWindsurfHookWithInput(windsurf.HookNamePreUserPrompt, input)
+}
+
+// SimulateWindsurfPostWriteCode simulates the post-write-code hook for Windsurf.
+func (r *WindsurfHookRunner) SimulateWindsurfPostWriteCode(trajectoryID, filePath string) error {
+	r.T.Helper()
+
+	input := map[string]interface{}{
+		"agent_action_name": "post_write_code",
+		"trajectory_id":     trajectoryID,
+		"execution_id":      "exec-1",
+		"tool_call_id":      "tool-call-1",
+		"timestamp":         "2025-01-01T00:00:00Z",
+		"cwd":               r.RepoDir,
+		"tool_info": map[string]string{
+			"file_path": filePath,
+		},
+	}
+
+	return r.runWindsurfHookWithInput(windsurf.HookNamePostWriteCode, input)
+}
+
+// SimulateWindsurfPostCascadeResponse simulates the post-cascade-response hook for Windsurf.
+func (r *WindsurfHookRunner) SimulateWindsurfPostCascadeResponse(trajectoryID, response string) error {
+	r.T.Helper()
+
+	input := map[string]interface{}{
+		"agent_action_name": "post_cascade_response",
+		"trajectory_id":     trajectoryID,
+		"execution_id":      "exec-1",
+		"timestamp":         "2025-01-01T00:00:00Z",
+		"cwd":               r.RepoDir,
+		"tool_info": map[string]string{
+			"cascade_response": response,
+		},
+	}
+
+	return r.runWindsurfHookWithInput(windsurf.HookNamePostCascadeResponse, input)
+}
+
+// WindsurfSession represents a simulated Windsurf Cascade trajectory.
+type WindsurfSession struct {
+	ID             string // trajectory_id
+	TranscriptPath string
+	env            *TestEnv
+}
+
+// NewWindsurfSession creates a new simulated Windsurf session.
+func (env *TestEnv) NewWindsurfSession() *WindsurfSession {
+	env.T.Helper()
+
+	env.SessionCounter++
+	trajectoryID := fmt.Sprintf("windsurf-session-%d", env.SessionCounter)
+	transcriptPath := filepath.Join(env.RepoDir, ".entire", "tmp", "windsurf", trajectoryID+".jsonl")
+
+	return &WindsurfSession{
+		ID:             trajectoryID,
+		TranscriptPath: transcriptPath,
+		env:            env,
+	}
+}
+
+// CreateWindsurfTranscript creates a Windsurf JSONL transcript file for the session.
+func (s *WindsurfSession) CreateWindsurfTranscript(prompt string, changes []FileChange) string {
+	var lines []string
+
+	prePrompt := map[string]interface{}{
+		"agent_action_name": "pre_user_prompt",
+		"trajectory_id":     s.ID,
+		"execution_id":      "exec-1",
+		"timestamp":         "2025-01-01T00:00:00Z",
+		"tool_info": map[string]string{
+			"user_prompt": prompt,
+		},
+	}
+	prePromptJSON, _ := json.Marshal(prePrompt)
+	lines = append(lines, string(prePromptJSON))
+
+	for idx, change := range changes {
+		postWrite := map[string]interface{}{
+			"agent_action_name": "post_write_code",
+			"trajectory_id":     s.ID,
+			"execution_id":      "exec-1",
+			"tool_call_id":      fmt.Sprintf("tool-call-%d", idx+1),
+			"timestamp":         "2025-01-01T00:00:00Z",
+			"tool_info": map[string]string{
+				"file_path": change.Path,
+			},
+		}
+		postWriteJSON, _ := json.Marshal(postWrite)
+		lines = append(lines, string(postWriteJSON))
+	}
+
+	postCascade := map[string]interface{}{
+		"agent_action_name": "post_cascade_response",
+		"trajectory_id":     s.ID,
+		"execution_id":      "exec-1",
+		"timestamp":         "2025-01-01T00:00:00Z",
+		"tool_info": map[string]string{
+			"cascade_response": "Done!",
+		},
+	}
+	postCascadeJSON, _ := json.Marshal(postCascade)
+	lines = append(lines, string(postCascadeJSON))
+
+	if err := os.MkdirAll(filepath.Dir(s.TranscriptPath), 0o755); err != nil {
+		s.env.T.Fatalf("failed to create transcript dir: %v", err)
+	}
+
+	content := strings.Join(lines, "\n") + "\n"
+	if err := os.WriteFile(s.TranscriptPath, []byte(content), 0o644); err != nil {
+		s.env.T.Fatalf("failed to write transcript: %v", err)
+	}
+
+	return s.TranscriptPath
+}
+
+// SimulateWindsurfPreUserPrompt is a convenience method on TestEnv.
+func (env *TestEnv) SimulateWindsurfPreUserPrompt(trajectoryID, prompt string) error {
+	env.T.Helper()
+	runner := NewWindsurfHookRunner(env.RepoDir, env.T)
+	return runner.SimulateWindsurfPreUserPrompt(trajectoryID, prompt)
+}
+
+// SimulateWindsurfPostWriteCode is a convenience method on TestEnv.
+func (env *TestEnv) SimulateWindsurfPostWriteCode(trajectoryID, filePath string) error {
+	env.T.Helper()
+	runner := NewWindsurfHookRunner(env.RepoDir, env.T)
+	return runner.SimulateWindsurfPostWriteCode(trajectoryID, filePath)
+}
+
+// SimulateWindsurfPostCascadeResponse is a convenience method on TestEnv.
+func (env *TestEnv) SimulateWindsurfPostCascadeResponse(trajectoryID, response string) error {
+	env.T.Helper()
+	runner := NewWindsurfHookRunner(env.RepoDir, env.T)
+	return runner.SimulateWindsurfPostCascadeResponse(trajectoryID, response)
 }

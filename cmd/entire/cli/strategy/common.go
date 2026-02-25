@@ -476,7 +476,7 @@ func ReadSessionPromptFromTree(tree *object.Tree, checkpointPath string) string 
 
 // ReadAgentTypeFromTree reads the agent type from a checkpoint's metadata.json file in a git tree.
 // If metadata.json doesn't exist (shadow branches), it falls back to detecting the agent
-// from the presence of agent-specific config files (.gemini/settings.json or .claude/).
+// from the presence of agent-specific config files (.gemini, .claude, .opencode, .windsurf).
 // Returns agent.AgentTypeUnknown if the agent type cannot be determined.
 func ReadAgentTypeFromTree(tree *object.Tree, checkpointPath string) agent.AgentType {
 	// First, try to read from metadata.json (present in condensed/committed checkpoints)
@@ -504,6 +504,10 @@ func ReadAgentTypeFromTree(tree *object.Tree, checkpointPath string) agent.Agent
 	}
 	if _, err := tree.File("opencode.json"); err == nil {
 		return agent.AgentTypeOpenCode
+	}
+	// Windsurf: workspace hooks config under .windsurf/hooks.json
+	if _, err := tree.File(".windsurf/hooks.json"); err == nil {
+		return agent.AgentTypeWindsurf
 	}
 
 	return agent.AgentTypeUnknown

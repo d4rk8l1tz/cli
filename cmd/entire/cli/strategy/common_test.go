@@ -976,6 +976,8 @@ func TestIsProtectedPath(t *testing.T) {
 		{".claude/settings.json", true},
 		{".gemini", true},
 		{".gemini/settings.json", true},
+		{".windsurf", true},
+		{".windsurf/hooks.json", true},
 		{"src/main.go", false},
 		{"README.md", false},
 		{".gitignore", false},
