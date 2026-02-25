@@ -133,4 +133,3 @@ func TestParseHookEvent_MissingTrajectoryID(t *testing.T) {
 		t.Fatal("expected error when trajectory_id is missing")
 	}
 }
-

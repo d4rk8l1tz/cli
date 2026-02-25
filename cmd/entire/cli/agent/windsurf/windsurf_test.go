@@ -108,4 +108,3 @@ func TestGetSessionDirAndResolveSessionFile(t *testing.T) {
 		t.Fatalf("ResolveSessionFile() = %q, want %q", file, wantSuffix)
 	}
 }
-

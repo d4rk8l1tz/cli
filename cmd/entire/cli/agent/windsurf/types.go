@@ -4,15 +4,15 @@ import "encoding/json"
 
 // Hook names exposed as CLI subcommands under `entire hooks windsurf`.
 const (
-	HookNamePreUserPrompt      = "pre-user-prompt"
-	HookNamePostWriteCode      = "post-write-code"
+	HookNamePreUserPrompt       = "pre-user-prompt"
+	HookNamePostWriteCode       = "post-write-code"
 	HookNamePostCascadeResponse = "post-cascade-response"
 )
 
 // Windsurf action names from hook payloads (`agent_action_name`).
 const (
-	actionPreUserPrompt      = "pre_user_prompt"
-	actionPostWriteCode      = "post_write_code"
+	actionPreUserPrompt       = "pre_user_prompt"
+	actionPostWriteCode       = "post_write_code"
 	actionPostCascadeResponse = "post_cascade_response"
 )
 
@@ -61,4 +61,3 @@ type postWriteCodeInfo struct {
 type postCascadeResponseInfo struct {
 	CascadeResponse string `json:"cascade_response"`
 }
-
