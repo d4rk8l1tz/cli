@@ -21,6 +21,8 @@ const WindsurfHooksFileName = "hooks.json"
 
 // WindsurfHookConfig is a single hook command entry in .windsurf/hooks.json.
 // Additional fields are optional configuration flags supported by Windsurf.
+//
+//nolint:revive // Keep agent-prefixed name to match other agent config types.
 type WindsurfHookConfig struct {
 	Command          string `json:"command"`
 	ShowOutput       *bool  `json:"show_output,omitempty"`

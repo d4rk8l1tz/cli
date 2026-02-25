@@ -107,7 +107,7 @@ func (a *WindsurfAgent) ReadSession(input *agent.HookInput) (*agent.AgentSession
 		return nil, errors.New("session reference (transcript path) is required")
 	}
 
-	data, err := os.ReadFile(input.SessionRef) //nolint:gosec // Path comes from hook input
+	data, err := os.ReadFile(input.SessionRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read transcript: %w", err)
 	}

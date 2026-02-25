@@ -9,9 +9,9 @@ import (
 	"os"
 )
 
-// ParseEvents parses Windsurf hook JSONL transcript bytes.
+// parseEvents parses Windsurf hook JSONL transcript bytes.
 // Invalid lines are skipped to preserve resilience to partial writes.
-func ParseEvents(data []byte) ([]hookInputRaw, error) {
+func parseEvents(data []byte) ([]hookInputRaw, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
@@ -45,7 +45,7 @@ func parseEventsFromFile(path string) ([]hookInputRaw, error) {
 	if err != nil {
 		return nil, err //nolint:wrapcheck // Callers need to test os.IsNotExist.
 	}
-	return ParseEvents(data)
+	return parseEvents(data)
 }
 
 // GetTranscriptPosition returns the current transcript position for incremental parsing.
@@ -117,7 +117,7 @@ func (a *WindsurfAgent) ExtractSummary(sessionRef string) (string, error) {
 
 // ExtractModifiedFiles extracts modified files from raw JSONL transcript bytes.
 func ExtractModifiedFiles(data []byte) ([]string, error) {
-	events, err := ParseEvents(data)
+	events, err := parseEvents(data)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func ExtractModifiedFiles(data []byte) ([]string, error) {
 
 // ExtractAllUserPrompts extracts all user prompts from raw JSONL transcript bytes.
 func ExtractAllUserPrompts(data []byte) ([]string, error) {
-	events, err := ParseEvents(data)
+	events, err := parseEvents(data)
 	if err != nil {
 		return nil, err
 	}

@@ -16,12 +16,12 @@ func TestParseEventsAndExtraction(t *testing.T) {
 		`{"agent_action_name":"post_write_code","trajectory_id":"t1","tool_info":{"file_path":"a.go"}}` + "\n" +
 		`{"agent_action_name":"post_cascade_response","trajectory_id":"t1","tool_info":{"cascade_response":"All done"}}` + "\n")
 
-	events, err := ParseEvents(data)
+	events, err := parseEvents(data)
 	if err != nil {
-		t.Fatalf("ParseEvents() error = %v", err)
+		t.Fatalf("parseEvents() error = %v", err)
 	}
 	if len(events) != 5 {
-		t.Fatalf("ParseEvents() len = %d, want 5", len(events))
+		t.Fatalf("parseEvents() len = %d, want 5", len(events))
 	}
 
 	files, err := ExtractModifiedFiles(data)

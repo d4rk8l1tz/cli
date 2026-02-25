@@ -3,6 +3,7 @@ package windsurf
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -119,12 +120,12 @@ func appendHookPayload(sessionRef string, payload []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to open transcript file: %w", err)
 	}
-	defer f.Close() //nolint:errcheck // Best effort.
+	defer f.Close()
 
 	if _, err := f.Write(line); err != nil {
 		return fmt.Errorf("failed to append transcript line: %w", err)
 	}
-	if _, err := f.Write([]byte("\n")); err != nil {
+	if _, err := f.WriteString("\n"); err != nil {
 		return fmt.Errorf("failed to append transcript newline: %w", err)
 	}
 
@@ -137,7 +138,7 @@ func readHookInputBytes(stdin io.Reader) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read hook input: %w", err)
 	}
 	if len(bytes.TrimSpace(data)) == 0 {
-		return nil, fmt.Errorf("empty hook input")
+		return nil, errors.New("empty hook input")
 	}
 	return data, nil
 }

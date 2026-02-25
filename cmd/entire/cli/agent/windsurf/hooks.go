@@ -121,7 +121,7 @@ func (a *WindsurfAgent) UninstallHooks() error {
 	}
 
 	if len(rawSettings) == 0 && len(rawHooks) == 0 {
-		return nil //nolint:nilerr // Nothing to uninstall.
+		return nil
 	}
 
 	for _, key := range windsurfActionKeys {
@@ -254,7 +254,7 @@ func parseHookList(raw json.RawMessage) ([]WindsurfHookConfig, error) {
 
 	var hooks []WindsurfHookConfig
 	if err := json.Unmarshal(raw, &hooks); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unmarshal hook list: %w", err)
 	}
 	return hooks, nil
 }
@@ -267,7 +267,7 @@ func marshalHookList(rawHooks map[string]json.RawMessage, key string, hooks []Wi
 
 	data, err := json.Marshal(hooks)
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal hook list: %w", err)
 	}
 	rawHooks[key] = data
 	return nil
